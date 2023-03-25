@@ -76,13 +76,13 @@ def main():
     folder = 'txt'
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '--start_id',
+        'start_id',
         help='--start_id should be entered to download books.',
         default=1,
         type=int
     )
     parser.add_argument(
-        '--end_id',
+        'end_id',
         help='--start_id should be entered to download books.',
         default=11,
         type=int
