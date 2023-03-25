@@ -1,7 +1,8 @@
+import argparse
 import os
-import requests
 
 import lxml
+import requests
 
 from urllib.parse import unquote
 from urllib.parse import urljoin
@@ -73,7 +74,21 @@ def main():
     url = "https://tululu.org"
     path = os.path.abspath('.')
     folder = 'txt'
-    for book_id in range(1, 11):
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        '--start_id',
+        help='--start_id should be entered to download books.',
+        default=1,
+        type=int
+    )
+    parser.add_argument(
+        '--end_id',
+        help='--start_id should be entered to download books.',
+        default=11,
+        type=int
+    )
+    args = parser.parse_args()
+    for book_id in range(args.start_id, args.end_id):
         try:
             book_url_reponse = requests.get(f'{url}/txt.php', {'id': book_id})
             book_url_reponse.raise_for_status()
