@@ -3,6 +3,9 @@ import requests
 
 import lxml
 
+from urllib.parse import unquote
+from urllib.parse import urljoin
+from urllib.parse import urlparse
 from bs4 import BeautifulSoup
 from pathvalidate import sanitize_filename
 
@@ -21,40 +24,56 @@ def download_txt(url, filename, folder='books/'):
         os.makedirs(directory)
     filename = sanitize_filename(filename)
     filepath = os.path.join(os.path.abspath('.'), folder, f'{filename}.txt')
-    if check_for_redirect(response):
-        with open(filepath, 'wb') as file:
-            file.write(response.content)
-        return filepath
+    with open(filepath, 'wb') as file:
+        file.write(response.content)
+    return filepath
+
+
+def download_image(url, folder='images/'):
+    filename = urlparse(url).path.split("/")[-1]
+    response = requests.get(url)
+    response.raise_for_status()
+    directory = os.path.join(os.path.abspath('.'), folder)
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+    filepath = os.path.join(os.path.abspath('.'), folder, filename)
+    with open(filepath, 'wb') as file:
+        file.write(response.content)
+    return filepath
 
 
 def main():
     url = "https://tululu.org"
     for book_id in range(1, 11):
         try:
-            response = requests.get(
-                f'{url}/b{book_id}/'
-            )
-            if check_for_redirect(response):
-                soup = BeautifulSoup(response.text, 'lxml')
-                title, author = soup.find(
-                    'div',
-                    {'id': 'content'}
-                ).find('h1').text.split("::")
+            book_url_reponse = requests.get(f'{url}/txt.php', {'id': book_id})
+            if check_for_redirect(book_url_reponse):
+                title_response = requests.get(
+                    f'{url}/b{book_id}/'
+                )
+                soup = BeautifulSoup(title_response.text, 'lxml')
+                title = soup.find(
+                    'div',{'id': 'content'}
+                ).find('h1').text.split("::")[0]
                 filename = title.strip()
                 folder = 'txt'
-                filepath = download_txt(
-                    f'{url}/txt.php?id={book_id}',
+                image_url = urljoin(
+                    url, soup.find('div', class_='bookimage'
+                    ).find('img')['src']
+                )
+                image_path = download_image(
+                    image_url
+                )
+                book_path = download_txt(
+                    book_url_reponse.url,
                     f'{book_id}-{filename}',
                     folder
                 )
-                print(filepath)
+                print("Заголовок: ", filename)
+                print(image_url)
+                print()
         except requests.exceptions.HTTPError as error:
             raise error
-
-
-
-if __name__ == '__main__':
-    main()
     filepath = download_txt(
         "https://tululu.org/txt.php?id=32168",
         "Алиби"
@@ -71,3 +90,8 @@ if __name__ == '__main__':
         'Али\\би',
         folder='txt/')
     print(filepath)
+
+
+
+if __name__ == '__main__':
+    main()
