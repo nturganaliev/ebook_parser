@@ -44,6 +44,8 @@ def download_image(url, folder='images/'):
 
 def main():
     url = "https://tululu.org"
+    path = os.path.abspath('.')
+    all_comments = ''
     for book_id in range(1, 11):
         try:
             book_url_reponse = requests.get(f'{url}/txt.php', {'id': book_id})
@@ -53,43 +55,62 @@ def main():
                 )
                 soup = BeautifulSoup(title_response.text, 'lxml')
                 title = soup.find(
-                    'div',{'id': 'content'}
+                    'div', {'id': 'content'}
                 ).find('h1').text.split("::")[0]
                 filename = title.strip()
                 folder = 'txt'
                 image_url = urljoin(
-                    url, soup.find('div', class_='bookimage'
+                    url, soup.find('div', {'class': 'bookimage'}
                     ).find('img')['src']
                 )
-                image_path = download_image(
-                    image_url
-                )
-                book_path = download_txt(
-                    book_url_reponse.url,
-                    f'{book_id}-{filename}',
-                    folder
-                )
-                print("Заголовок: ", filename)
-                print(image_url)
-                print()
+                if soup.find_all('div', {'class': 'texts'}):
+                    comments = soup.find_all(
+                        'div', {'class': 'texts'}
+                    )
+                    if comments:
+                        for comment in comments:
+                            # print(comment.find('span').text)
+                            all_comments += f"{comment.find('span').text}\n"
+                        with open(
+                            os.path.join(path, folder, 'comments.txt'), 'w'
+                        ) as file:
+                            file.write(all_comments)
+                genre = soup.find(
+                    'span', {'class': 'd_book'}
+                ).text.split(':')[1].strip().split(',')
+
+                print(genre)
+                # image_path = download_image(
+                #     image_url
+                # )
+                # book_path = download_txt(
+                #     book_url_reponse.url,
+                #     f'{book_id}-{filename}',
+                #     folder
+                # )
+                # print("Заголовок: ", filename)
+                # print(image_url)
+                # print()
+
+
         except requests.exceptions.HTTPError as error:
             raise error
-    filepath = download_txt(
-        "https://tululu.org/txt.php?id=32168",
-        "Алиби"
-    )
-    print(filepath)
-    filepath = download_txt(
-        "https://tululu.org/txt.php?id=32168",
-        'Али/би',
-        folder='books/'
-    )
-    print(filepath)
-    filepath = download_txt(
-        "https://tululu.org/txt.php?id=32168",
-        'Али\\би',
-        folder='txt/')
-    print(filepath)
+    # filepath = download_txt(
+    #     "https://tululu.org/txt.php?id=32168",
+    #     "Алиби"
+    # )
+    # print(filepath)
+    # filepath = download_txt(
+    #     "https://tululu.org/txt.php?id=32168",
+    #     'Али/би',
+    #     folder='books/'
+    # )
+    # print(filepath)
+    # filepath = download_txt(
+    #     "https://tululu.org/txt.php?id=32168",
+    #     'Али\\би',
+    #     folder='txt/')
+    # print(filepath)
 
 
 
