@@ -1,5 +1,6 @@
 import argparse
 import os
+import time
 
 import lxml
 import requests
@@ -11,18 +12,21 @@ from bs4 import BeautifulSoup
 from pathvalidate import sanitize_filename
 
 
+class InvalidLinkException(Exception):
+    "Raised when link does not exist for downloading"
+    pass
+
+
 def check_for_redirect(response):
     if response.history:
-        return False
-    return True
+        raise InvalidLinkException
 
 
 def download_txt(url, filename, folder='books/'):
     response = requests.get(url)
     response.raise_for_status()
     directory = os.path.join(os.path.abspath('.'), folder)
-    if not os.path.exists(directory):
-        os.makedirs(directory)
+    os.makedirs(directory, exist_ok=True)
     filename = sanitize_filename(filename)
     filepath = os.path.join(os.path.abspath('.'), folder, f'{filename}.txt')
     with open(filepath, 'wb') as file:
@@ -35,8 +39,7 @@ def download_image(url, folder='images/'):
     response = requests.get(url)
     response.raise_for_status()
     directory = os.path.join(os.path.abspath('.'), folder)
-    if not os.path.exists(directory):
-        os.makedirs(directory)
+    os.makedirs(directory, exist_ok=True)
     filepath = os.path.join(os.path.abspath('.'), folder, filename)
     with open(filepath, 'wb') as file:
         file.write(response.content)
@@ -71,10 +74,13 @@ def parse_book_page(content):
 
 
 def main():
-    url = "https://tululu.org"
+    url = 'https://tululu.org'
     path = os.path.abspath('.')
     folder = 'txt'
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(
+        description = 'Enter first and last id'\
+                      'to set range to download books.'
+    )
     parser.add_argument(
         'start_id',
         help='--start_id should be entered to download books.',
@@ -92,17 +98,21 @@ def main():
         try:
             book_url_reponse = requests.get(f'{url}/txt.php', {'id': book_id})
             book_url_reponse.raise_for_status()
-            if check_for_redirect(book_url_reponse):
+            try:
+                check_for_redirect(book_url_reponse)
                 page_response = requests.get(
                     f'{url}/b{book_id}/'
                 )
                 page_response.raise_for_status()
                 content = page_response.text
-                page_data = parse_book_page(content)
-                image_url = urljoin(url, page_data['image_url'])
-                filename = page_data['title']
-                genre = page_data['genre']
-                comments = page_data['comments']
+                parsed_content = parse_book_page(content)
+                image_url = urljoin(
+                    page_response.url,
+                    parsed_content['image_url']
+                )
+                filename = parsed_content['title']
+                genre = parsed_content['genre']
+                comments = parsed_content['comments']
                 image_path = download_image(image_url)
                 book_path = download_txt(
                     book_url_reponse.url,
@@ -118,24 +128,14 @@ def main():
                 print(image_url)
                 print(genre)
                 print()
+            except InvalidLinkException:
+                print("Exception occured: Link to download"\
+                      "book in txt format do not exist.\n")
         except requests.exceptions.HTTPError as error:
-            raise error
-    filepath = download_txt(
-        "https://tululu.org/txt.php?id=32168",
-        "Алиби"
-    )
-    print(filepath)
-    filepath = download_txt(
-        "https://tululu.org/txt.php?id=32168",
-        'Али/би',
-        folder='books/'
-    )
-    print(filepath)
-    filepath = download_txt(
-        "https://tululu.org/txt.php?id=32168",
-        'Али\\би',
-        folder='txt/')
-    print(filepath)
+            print(error)
+        except requests.exceptions.ConnectionError as error:
+            print(error)
+            time.sleep(30)
 
 
 if __name__ == '__main__':
