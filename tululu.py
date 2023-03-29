@@ -96,10 +96,10 @@ def main():
     args = parser.parse_args()
     for book_id in range(args.start_id, args.end_id):
         try:
-            book_url_reponse = requests.get(f'{url}/txt.php', {'id': book_id})
-            book_url_reponse.raise_for_status()
+            book_url_response = requests.get(f'{url}/txt.php', {'id': book_id})
+            book_url_response.raise_for_status()
             try:
-                check_for_redirect(book_url_reponse)
+                check_for_redirect(book_url_response)
                 page_response = requests.get(
                     f'{url}/b{book_id}/'
                 )
