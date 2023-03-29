@@ -20,11 +20,12 @@ class InvalidLinkException(Exception):
 def check_for_redirect(response):
     if response.history:
         raise InvalidLinkException
+    response.raise_for_status()
 
 
 def download_txt(url, filename, folder='books/'):
     response = requests.get(url)
-    response.raise_for_status()
+    check_for_redirect(response)
     directory = os.path.join(os.path.abspath('.'), folder)
     os.makedirs(directory, exist_ok=True)
     filename = sanitize_filename(filename)
@@ -97,44 +98,46 @@ def main():
     for book_id in range(args.start_id, args.end_id):
         try:
             book_url_reponse = requests.get(f'{url}/txt.php', {'id': book_id})
-            book_url_reponse.raise_for_status()
-            try:
-                check_for_redirect(book_url_reponse)
-                page_response = requests.get(
-                    f'{url}/b{book_id}/'
-                )
-                page_response.raise_for_status()
-                content = page_response.text
-                parsed_content = parse_book_page(content)
-                image_url = urljoin(
-                    page_response.url,
-                    parsed_content['image_url']
-                )
-                filename = parsed_content['title']
-                genre = parsed_content['genre']
-                comments = parsed_content['comments']
-                image_path = download_image(image_url)
-                book_path = download_txt(
-                    book_url_reponse.url,
-                    f'{book_id}-{filename}',
-                    folder
-                )
-                with open(
-                    os.path.join(path, folder, 'comments.txt'),
-                    'a'
-                ) as file:
-                    file.write(comments)
-                print("Заголовок: ", filename)
-                print(image_url)
-                print(genre)
-                print()
-            except InvalidLinkException:
-                print("Exception occured: Link to download"\
-                      "book in txt format do not exist.\n")
+            check_for_redirect(book_url_reponse)
+
+            page_response = requests.get(
+                f'{url}/b{book_id}/'
+            )
+            check_for_redirect(page_response)
+
+            content = page_response.text
+            parsed_content = parse_book_page(content)
+            image_url = urljoin(
+                page_response.url,
+                parsed_content['image_url']
+            )
+            filename = parsed_content['title']
+            genre = parsed_content['genre']
+            comments = parsed_content['comments']
+            image_path = download_image(image_url)
+            book_path = download_txt(
+                book_url_reponse.url,
+                f'{book_id}-{filename}',
+                folder
+            )
+            with open(
+                os.path.join(path, folder, 'comments.txt'),
+                'a'
+            ) as file:
+                file.write(comments)
+            print("Заголовок: ", filename)
+            print(image_url)
+            print(genre)
+            print()
+        except InvalidLinkException:
+            print("Exception occured: Link to download"\
+                  "book in txt format do not exist.\n")
         except requests.exceptions.HTTPError as error:
             print(error)
+            print()
         except requests.exceptions.ConnectionError as error:
             print(error)
+            print()
             time.sleep(30)
 
 
