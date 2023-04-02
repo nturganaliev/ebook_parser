@@ -92,26 +92,61 @@ def main():
     category_url = 'https://tululu.org/l55/'
     path = os.path.abspath('.')
     books_folder = 'books'
+    images_folder = 'images'
     book_links = []
     books_description = []
+    books_description_folder = books_folder
     parser = argparse.ArgumentParser(
         description = 'Enter first and last id'\
                       'to set range to download books.'
     )
     parser.add_argument(
-        'start_id',
-        help='--start_id should be entered to download books.',
+        '--start_page',
+        help='--start_page should be entered to download books.',
+        nargs='?',
         default=1,
         type=int
     )
     parser.add_argument(
-        'end_id',
-        help='--start_id should be entered to download books.',
-        default=11,
+        '--end_page',
+        help='--end_page should be entered to download books.',
+        nargs='?',
+        default=702,
         type=int
     )
+    parser.add_argument(
+        '--skip_images',
+        help='--skip_images should be entered to skip downloading images.',
+        action='store_true'
+    )
+    parser.add_argument(
+        '--dest_folder',
+        nargs='?',
+        help='--dest_folder should be entered to change downloading path.',
+        type=str
+    )
+    parser.add_argument(
+        '--json_path',
+        nargs='?',
+        help='--json_path should be entered to change' \
+             'downloading path of books description file.',
+        type=str
+    )
+    parser.add_argument(
+        '--skip_txt',
+        help='--skip_txt should be entered to skip downloading books.',
+        action='store_true'
+    )
     args = parser.parse_args()
-    for page in range(args.start_id, args.end_id):
+    if args.dest_folder:
+        books_folder = args.dest_folder
+        images_folder = args.dest_folder
+
+    if args.json_path:
+        books_description_folder = args.json_path
+        os.makedirs(books_description_folder, exist_ok=True)
+
+    for page in range(args.start_page, args.end_page):
         book_links += get_book_links_from_category(f'{category_url}{page}')
 
     for index, link in enumerate(book_links):
@@ -138,12 +173,21 @@ def main():
             author = parsed_content['author']
             genres = parsed_content['genre']
             comments = parsed_content['comments']
-            image_path = download_image(image_url)
-            book_path = download_txt(
-                book_url_response.url,
-                f'{index}-я книга. {title}',
-                books_folder
-            )
+            if not args.skip_images:
+                image_path = download_image(
+                    image_url,
+                    images_folder
+                )
+            else:
+                image_path = None
+            if not args.skip_txt:
+                book_path = download_txt(
+                    book_url_response.url,
+                    f'{index}-я книга. {title}',
+                    books_folder
+                )
+            else:
+                book_path = None
             books_description.append({
                 'title': title,
                 'author': author,
@@ -166,11 +210,18 @@ def main():
             print(error)
             print()
             time.sleep(30)
+
     with open(
-        os.path.join(path, books_folder, 'books_description.json'),
+        os.path.join(path, books_description_folder, 'books_description.json'),
         'wb',
     ) as file:
-        file.write(json.dumps(books_description, ensure_ascii=False, indent=4).encode('utf8'))
+        file.write(
+            json.dumps(
+                books_description,
+                ensure_ascii=False,
+                indent=4
+            ).encode('utf8')
+        )
 
 
 if __name__ == '__main__':
