@@ -68,24 +68,16 @@ def download_image(url, folder='images/'):
 def parse_book_page(content):
     all_comments = ''
     soup = BeautifulSoup(content, 'lxml')
-    title, author = soup.find(
-        'div', {'id': 'content'}
-    ).find('h1').text.split("::")
-    title = title.strip()
-    author = author.strip()
-    image_url = soup.find(
-        'div', {'class': 'bookimage'}
-    ).find('img')['src']
-    if soup.find_all('div', {'class': 'texts'}):
-        comments = soup.find_all(
-            'div', {'class': 'texts'}
-        )
+    title, author = list(
+        map(str.strip, soup.select('div#content h1')[0].text.split("::"))
+    )
+    image_url = soup.select('div.bookimage img')[0]['src']
+    if soup.select('div.texts'):
+        comments = soup.select('div.texts')
         if comments:
             for comment in comments:
                 all_comments += f"{comment.find('span').text}\n"
-    genre = soup.find(
-        'span', {'class': 'd_book'}
-    ).text.split(':')[1].strip().split(',')
+    genre = [a.text for a in soup.select('span.d_book a')]
     return {
         'title': title,
         'author': author,
