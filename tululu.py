@@ -155,6 +155,8 @@ def main():
             print()
             time.sleep(30)
 
+
+
     for index, link in enumerate(book_links):
         try:
             book_id = urlparse(link).path.split('/')[1][1:]
@@ -232,7 +234,7 @@ def main():
             file,
             ensure_ascii=False,
             indent=4
-        ).encode('utf8')
+        )
 
 
 if __name__ == '__main__':
