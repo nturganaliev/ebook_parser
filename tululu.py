@@ -21,24 +21,20 @@ class InvalidLinkException(Exception):
 def check_for_redirect(response):
     if response.history:
         raise InvalidLinkException
-    response.raise_for_status()
 
 
 def get_book_links_from_category(category_url):
-    link_list = []
+    page_links = []
     response = requests.get(category_url)
     response.raise_for_status()
+    check_for_redirect(response)
     soup = BeautifulSoup(response.text, 'lxml')
-    links = soup.find('div', {'id': 'content'}).find_all('a')
+    links = soup.select('div#content a')
     for link in links:
         if (link['href'].startswith('/b')
-            and urljoin(category_url, link['href']) not in link_list):
-            link_list.append(urljoin(category_url, link['href']))
-    return link_list
-
-
-def get_book_id(link):
-    return urlparse(link).path.split('/')[1][1:]
+            and urljoin(category_url, link['href']) not in page_links):
+            page_links.append(urljoin(category_url, link['href']))
+    return page_links
 
 
 def download_txt(url, filename, folder='books/'):
@@ -50,7 +46,7 @@ def download_txt(url, filename, folder='books/'):
     filepath = os.path.join(os.path.abspath('.'), folder, f'{filename}.txt')
     with open(filepath, 'wb') as file:
         file.write(response.content)
-    return filepath
+    return os.path.join(folder, filename)
 
 
 def download_image(url, folder='images/'):
@@ -62,7 +58,7 @@ def download_image(url, folder='images/'):
     filepath = os.path.join(os.path.abspath('.'), folder, filename)
     with open(filepath, 'wb') as file:
         file.write(response.content)
-    return filepath
+    return os.path.join(folder, filename)
 
 
 def parse_book_page(content):
@@ -77,12 +73,12 @@ def parse_book_page(content):
         if comments:
             for comment in comments:
                 all_comments += f"{comment.find('span').text}\n"
-    genre = [a.text for a in soup.select('span.d_book a')]
+    genres = [a.text for a in soup.select('span.d_book a')]
     return {
         'title': title,
         'author': author,
         'image_url': image_url,
-        'genre': genre,
+        'genres': genres,
         'comments': all_comments
     }
 
@@ -94,24 +90,24 @@ def main():
     books_folder = 'books'
     images_folder = 'images'
     book_links = []
-    books_description = []
-    books_description_folder = books_folder
+    book_descriptions = []
+    book_descriptions_folder = books_folder
     parser = argparse.ArgumentParser(
         description = 'Enter first and last id'\
                       'to set range to download books.'
     )
     parser.add_argument(
-        '--start_page',
+        'start_page',
         help='--start_page should be entered to download books.',
         nargs='?',
         default=1,
         type=int
     )
     parser.add_argument(
-        '--end_page',
+        'end_page',
         help='--end_page should be entered to download books.',
         nargs='?',
-        default=702,
+        default=701,
         type=int
     )
     parser.add_argument(
@@ -143,24 +139,36 @@ def main():
         images_folder = args.dest_folder
 
     if args.json_path:
-        books_description_folder = args.json_path
-        os.makedirs(books_description_folder, exist_ok=True)
+        books_descriptions_folder = args.json_path
+        os.makedirs(books_descriptions_folder, exist_ok=True)
 
     for page in range(args.start_page, args.end_page):
-        book_links += get_book_links_from_category(f'{category_url}{page}')
+        try:
+            book_links += get_book_links_from_category(f'{category_url}{page}')
+        except InvalidLinkException:
+            print("Exception occured: Link do not exist.\n")
+        except requests.exceptions.HTTPError as error:
+            print(error)
+            print()
+        except requests.exceptions.ConnectionError as error:
+            print(error)
+            print()
+            time.sleep(30)
 
     for index, link in enumerate(book_links):
         try:
-            book_id = get_book_id(link)
+            book_id = urlparse(link).path.split('/')[1][1:]
             book_url_response = requests.get(
                 urljoin(url, 'txt.php'),
                 {'id': book_id}
             )
+            book_url_response.raise_for_status()
             check_for_redirect(book_url_response)
 
             page_response = requests.get(
                 f'{url}/b{book_id}/'
             )
+            page_response.raise_for_status()
             check_for_redirect(page_response)
 
             content = page_response.text
@@ -171,7 +179,7 @@ def main():
             )
             title = parsed_content['title']
             author = parsed_content['author']
-            genres = parsed_content['genre']
+            genres = parsed_content['genres']
             comments = parsed_content['comments']
             if not args.skip_images:
                 image_path = download_image(
@@ -188,13 +196,13 @@ def main():
                 )
             else:
                 book_path = None
-            books_description.append({
+            book_descriptions.append({
                 'title': title,
                 'author': author,
                 'img_src': image_path,
                 'book_path': book_path,
                 'comments': comments,
-                'gengres': genres
+                'genres': genres
             })
             print("Заголовок: ", title)
             print(image_url)
@@ -212,16 +220,19 @@ def main():
             time.sleep(30)
 
     with open(
-        os.path.join(path, books_description_folder, 'books_description.json'),
-        'wb',
+        os.path.join(
+            path,
+            book_descriptions_folder,
+            'book_descriptions.json'
+        ),
+        'w',
     ) as file:
-        file.write(
-            json.dumps(
-                books_description,
-                ensure_ascii=False,
-                indent=4
-            ).encode('utf8')
-        )
+        json.dump(
+            book_descriptions,
+            file,
+            ensure_ascii=False,
+            indent=4
+        ).encode('utf8')
 
 
 if __name__ == '__main__':
